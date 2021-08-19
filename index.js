@@ -9,8 +9,12 @@ bot.on('new_chat_members', async (ctx) => {
     const p = await ctx.promoteChatMember(member.id, {
       is_anonymous: true,
     });
-    if(p)
+    if(p) {
       console.log('Promoted ' + member.username);
+    }
+    else {
+      console.console.error('Cannot promote: ' + p);
+    }
   }
 })
 
