@@ -18,7 +18,7 @@ if(process.env.PROD) {
   console.log('Launch in prod mode');
   bot.launch({
     webhook: {
-      process.env.URL,
+      domain: process.env.URL,
       port: Number(process.env.PORT),
     }
   })
