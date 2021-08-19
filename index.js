@@ -2,10 +2,17 @@ require('dotenv').config();
 const { Telegraf } = require('telegraf');
 
 const bot = new Telegraf(process.env.TOKEN);
+
 bot.start((ctx) => ctx.reply('Welcome'));
-bot.help((ctx) => ctx.reply('Send me a sticker'));
-bot.on('sticker', (ctx) => ctx.reply('👍'));
-bot.hears('hi', (ctx) => ctx.reply('Hey there'));
+bot.on('new_chat_members', async (ctx) => {
+  for (const member of ctx.message.new_chat_members) {
+    const p = await ctx.promoteChatMember(member.id, {
+      is_anonymous: true,
+    });
+    if(p)
+      console.log('Promoted ' + member.username);
+  }
+})
 bot.launch();
 
 // Enable graceful stop
