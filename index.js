@@ -5,39 +5,47 @@ const bot = new Telegraf(process.env.TOKEN);
 
 bot.start((ctx) => ctx.reply('Welcome'));
 
-bot.on('new_chat_members', async (ctx) => {
-  for (const member of ctx.message.new_chat_members) {
-    // Don't promote bots
-    if(member.is_bot) {
-      continue;
-    }
+async function tryToPromote(ctx, user) {
+  console.log('\tNew user: ' + user.username);
+  // Don't promote bots
+  if(user.is_bot) {
+    console.log('\tIt is bot');
+    return false;
+  }
 
-    const p = await ctx.promoteChatMember(member.id, {
-      is_anonymous: true,
-    });
-    if(p) {
-      console.log('Promoted ' + member.username);
+  try {
+    const member = await ctx.getChatMember(user.id);
+    if (member.status === 'member') {
+      await ctx.promoteChatMember(user.id, { is_anonymous: true });
+      console.log('\tPromoted');
+      return true;
+    } else {
+      console.log('\tCannot promote ' + member.status);
+      return false;
     }
-    else {
-      console.error('Cannot promote: ' + p);
-    }
+  } catch (error) {
+    console.log('\tCannot promote');
+    console.error(error);
+    return false;
+  }
+}
+
+bot.on('new_chat_members', async (ctx) => {
+  console.log('New chat members');
+  for (const member of ctx.message.new_chat_members) {
+    tryToPromote(ctx, member);
   }
 })
 
-bot.on('message', async (ctx) => {
+bot.on('text', async (ctx) => {
   const { from, chat, message_id } = ctx.update.message;
   if(from.is_bot){
     return;
   }
-  await ctx.deleteMessage(message_id);
-  const p = await ctx.promoteChatMember(from.id, {
-    is_anonymous: true,
-  });
-  if(p) {
-    console.log('Promoted ' + member.username);
-  }
-  else {
-    console.error('Cannot promote: ' + p);
+  console.log('Text from a new user');
+  if(await tryToPromote(ctx, from)) {
+    await ctx.deleteMessage(message_id);
+    console.log('\tDelete message of promoted user');
   }
 });
 
