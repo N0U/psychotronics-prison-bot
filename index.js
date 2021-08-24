@@ -18,7 +18,10 @@ bot.command('delete', async (ctx) => {
       await ctx.reply('Cannot delete message from another chat');
       return;
     }
-    await ctx.deleteMessage(reply.message_id);
+    await Promise.all([
+      await ctx.deleteMessage(reply.message_id),
+      await ctx.deleteMessage(message.message_id),
+    ]);
   }
   catch (error) {
     console.log('\tCannot delete message');
