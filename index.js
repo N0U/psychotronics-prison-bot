@@ -5,6 +5,27 @@ const bot = new Telegraf(process.env.TOKEN);
 
 bot.start((ctx) => ctx.reply('Welcome'));
 
+bot.command('delete', async (ctx) => {
+  console.log('Deleting message...');
+  const { message } = ctx.update;
+  const { reply_to_message: reply } = message;
+  try {
+    if(!reply) {
+      await ctx.reply('Reply message to delete');
+      return;
+    }
+    if(reply.chat.id !== message.chat.id) {
+      await ctx.reply('Cannot delete message from another chat');
+      return;
+    }
+    await ctx.deleteMessage(reply.message_id);
+  }
+  catch (error) {
+    console.log('\tCannot delete message');
+    console.error(error);
+  }
+});
+
 async function tryToPromote(ctx, user) {
   console.log('\tNew user: ' + user.username);
   // Don't promote bots
