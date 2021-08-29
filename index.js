@@ -10,7 +10,7 @@ const bot = new Telegraf(process.env.TOKEN);
 
 const creatingThreads = {};
 
-bot.start((ctx) => ctx.reply('Welcome'));
+bot.start((ctx) => ctx.reply('Привет'));
 
 bot.command('delete', async (ctx) => {
   console.log('Deleting message...');
@@ -18,11 +18,11 @@ bot.command('delete', async (ctx) => {
   const { reply_to_message: reply } = message;
   try {
     if(!reply) {
-      await ctx.reply('Reply message to delete');
+      await ctx.reply('Котик, я не понимаю что удалять. Вызови эту команду когда пишешь ответ на нужное сообщение');
       return;
     }
     if(reply.chat.id !== message.chat.id) {
-      await ctx.reply('Cannot delete message from another chat');
+      await ctx.reply('Я не буду удалять сообщения из другого чата');
       return;
     }
     await Promise.all([
@@ -38,7 +38,8 @@ bot.command('delete', async (ctx) => {
 
 bot.command('thread', async (ctx) => {
   const { from, chat } = ctx.update.message;
-  if(from.is_bot || chat.type !== 'private') {
+  if(chat.type !== 'private') {
+    await ctx.reply('Не так, котик. Чтобы создать новый тред пиши мне в личку');
     return;
   }
 
