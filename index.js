@@ -1,7 +1,13 @@
 require('dotenv').config();
-const { Telegraf, Telegram } = require('telegraf');
+const { Telegraf, Telegram, Markup } = require('telegraf');
+
+const GROUP = process.env.GROUP;
+const CHANNEL = process.env.CHANNEL;
 
 const bot = new Telegraf(process.env.TOKEN);
+
+let lastGroupMessageId = false;
+const lastMessages = {};
 
 bot.start((ctx) => ctx.reply('Welcome'));
 
@@ -26,6 +32,33 @@ bot.command('delete', async (ctx) => {
   catch (error) {
     console.log('\tCannot delete message');
     console.error(error);
+  }
+});
+
+bot.command('thread', async (ctx) => {
+  const { from, chat } = ctx.update.message;
+  if(from.is_bot || chat.type !== 'private') {
+    return;
+  }
+
+  try {
+    const lastMessageId = lastMessages[from.id];
+    if(!lastMessageId) {
+      await ctx.reply('WAT?');
+      return;
+    }
+    const { message_id: newGroupMessageId } = await ctx.telegram.copyMessage(GROUP, from.id, lastMessageId);
+    const keyboard = Markup.inlineKeyboard([
+      Markup.button.url('К треду', `https://t.me/c/${GROUP.slice(4)}/${newGroupMessageId}?thread=${newGroupMessageId}`)
+    ]);
+    const { message_id: newChannelMessageId } = await ctx.telegram.copyMessage(CHANNEL, from.id, lastMessageId, keyboard);
+    await ctx.telegram.editMessageReplyMarkup(GROUP, newGroupMessageId, undefined, keyboard.reply_markup);
+    await ctx.reply('Тред удачно создан', keyboard);
+  } catch(error) {
+    console.log(error);
+    await ctx.reply('Faill to create new thread');
+  } finally {
+    lastMessages[from.id] = false;
   }
 });
 
@@ -63,7 +96,14 @@ bot.on('new_chat_members', async (ctx) => {
 
 bot.on('text', async (ctx) => {
   const { from, chat, message_id } = ctx.update.message;
-  if(from.is_bot){
+  if(from.is_bot || chat.type !== 'private') {
+    return;
+  }
+  lastMessages[from.id] = message_id;
+});
+/*bot.on('text', async (ctx) => {
+  const { from, chat, message_id } = ctx.update.message;
+  if(from.is_bot || ctx.update.message.chat.type === 'private'){
     return;
   }
   console.log('Text from a new user');
@@ -71,7 +111,7 @@ bot.on('text', async (ctx) => {
     await ctx.deleteMessage(message_id);
     console.log('\tDelete message of promoted user');
   }
-});
+});*/
 
 if(process.env.PROD) {
   console.log('Launch in prod mode');
