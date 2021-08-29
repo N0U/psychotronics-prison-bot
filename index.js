@@ -1,13 +1,14 @@
 require('dotenv').config();
 const { Telegraf, Telegram, Markup } = require('telegraf');
+const markdownEscape = require('markdown-escape');
+const NEW_LINE = '\r\n';
 
 const GROUP = process.env.GROUP;
 const CHANNEL = process.env.CHANNEL;
 
 const bot = new Telegraf(process.env.TOKEN);
 
-let lastGroupMessageId = false;
-const lastMessages = {};
+const creatingThreads = {};
 
 bot.start((ctx) => ctx.reply('Welcome'));
 
@@ -41,26 +42,30 @@ bot.command('thread', async (ctx) => {
     return;
   }
 
+  creatingThreads[from.id] = { stage: 0 };
+  await ctx.reply('Котик, введи тему треда');
+});
+
+async function createThread(ctx, title, text) {
   try {
-    const lastMessageId = lastMessages[from.id];
-    if(!lastMessageId) {
-      await ctx.reply('WAT?');
-      return;
-    }
-    const { message_id: newGroupMessageId } = await ctx.telegram.copyMessage(GROUP, from.id, lastMessageId);
-    const keyboard = Markup.inlineKeyboard([
-      Markup.button.url('К треду', `https://t.me/c/${GROUP.slice(4)}/${newGroupMessageId}?thread=${newGroupMessageId}`)
-    ]);
-    const { message_id: newChannelMessageId } = await ctx.telegram.copyMessage(CHANNEL, from.id, lastMessageId, keyboard);
-    await ctx.telegram.editMessageReplyMarkup(GROUP, newGroupMessageId, undefined, keyboard.reply_markup);
-    await ctx.reply('Тред удачно создан', keyboard);
+    const tg = ctx.telegram;
+    const messageText = `*${markdownEscape('=== ' + title + ' ===')}*${NEW_LINE}${markdownEscape(text)}`;
+    const groupMessage = await tg.sendMessage(GROUP, messageText,{
+      parse_mode: 'Markdown',
+    });
+    const groupMessageId = groupMessage.message_id;
+
+    const reply_markup = Markup.inlineKeyboard([
+      Markup.button.url('К треду', `https://t.me/c/${GROUP.slice(4)}/${groupMessageId}?thread=${groupMessageId}`)
+    ]).reply_markup;
+    await tg.sendMessage(CHANNEL, messageText, { parse_mode: 'Markdown', reply_markup: reply_markup });
+    await tg.editMessageReplyMarkup(GROUP, groupMessageId, undefined, reply_markup);
+    await ctx.reply('Котик, твой тред готов', { reply_markup: reply_markup });
   } catch(error) {
     console.log(error);
-    await ctx.reply('Faill to create new thread');
-  } finally {
-    lastMessages[from.id] = false;
+    await ctx.reply('Не повезло, не фортануло. Твой тред не создался');
   }
-});
+}
 
 async function tryToPromote(ctx, user) {
   console.log('\tNew user: ' + user.username);
@@ -95,11 +100,28 @@ bot.on('new_chat_members', async (ctx) => {
 })
 
 bot.on('text', async (ctx) => {
-  const { from, chat, message_id } = ctx.update.message;
+  const { message } = ctx.update;
+  const { from, chat } = message;
   if(from.is_bot || chat.type !== 'private') {
     return;
   }
-  lastMessages[from.id] = message_id;
+
+  const status = creatingThreads[from.id];
+  if(status) {
+    try {
+      if(status.stage === 0) {
+        creatingThreads[from.id] = { stage: 1, title: message.text };
+        await ctx.reply('Молодец. Теперь введи текст для главного поста');
+      } else if(status.stage === 1) {
+        await createThread(ctx, status.title, message.text);
+        delete creatingThreads[from.id];
+      }
+    } catch(error) {
+      console.log(error);
+      delete creatingThreads[from.id];
+      await ctx.reply('Извини, что-то пошло не так. Попробуй ещё раз');
+    }
+  }
 });
 /*bot.on('text', async (ctx) => {
   const { from, chat, message_id } = ctx.update.message;
