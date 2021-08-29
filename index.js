@@ -57,7 +57,7 @@ async function createThread(ctx, title, text) {
     const groupMessageId = groupMessage.message_id;
 
     const reply_markup = Markup.inlineKeyboard([
-      Markup.button.url('К треду', `https://t.me/c/${GROUP.slice(4)}/${groupMessageId}?thread=${groupMessageId}`)
+      Markup.button.url('К треду', `https://t.me/c/${GROUP.slice(4)}/99999999?thread=${groupMessageId}`)
     ]).reply_markup;
     await tg.sendMessage(CHANNEL, messageText, { parse_mode: 'Markdown', reply_markup: reply_markup });
     await tg.editMessageReplyMarkup(GROUP, groupMessageId, undefined, reply_markup);
