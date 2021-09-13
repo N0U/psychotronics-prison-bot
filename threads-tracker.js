@@ -53,9 +53,10 @@ class ThreadsTracker{
 
   addPost(id, date, replyId) {
     if(this.posts.get(id)) {
+      console.log('post already exist');
       return;
     }
-    
+
     const thread = this.getThread(replyId);
     if(!thread) {
       return false;
@@ -69,7 +70,7 @@ class ThreadsTracker{
   getTopThreads(n = 10) {
     return Object.values(this.threads)
       .filter(v => typeof v === 'object')
-      .sort((a, b) => a.date < b.date)
+      .sort((a, b) => a.date - b.date)
       .slice(-n);
   }
 

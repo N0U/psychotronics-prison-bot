@@ -44,15 +44,12 @@ bot.command('top', async (ctx) => {
   const chat = ctx.update.message.chat;
   const tg = ctx.telegram;
   const threads = threadsTracker.getTopThreads(3);
-
+  console.log(threads);
   try {
-    const promises = [
-      ctx.reply('Котик, вот топовые треды'),
-    ];
+    await ctx.reply('Котик, вот топовые треды');
     for(const t of threads) {
-      promises.push(tg.forwardMessage(chat.id,GROUP, t.id));
+      await tg.forwardMessage(chat.id,GROUP, t.id);
     }
-    await Promise.all(promises);
   } catch(error) {
     console.error(error);
   }
