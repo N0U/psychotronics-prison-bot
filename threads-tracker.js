@@ -33,8 +33,10 @@ class ThreadsTracker{
   }
 
   addThread(id, date) {
-    this.threads.set(id, { id, date, lastPostId: id });
-    this.addPost(id, date, id);
+    if(!this.threads.get(id)) {
+      this.threads.set(id, { id, date, lastPostId: id });
+      this.addPost(id, date, id);
+    }
   }
 
   getThread(replyId) {
@@ -50,6 +52,10 @@ class ThreadsTracker{
   }
 
   addPost(id, date, replyId) {
+    if(this.posts.get(id)) {
+      return;
+    }
+    
     const thread = this.getThread(replyId);
     if(!thread) {
       return false;

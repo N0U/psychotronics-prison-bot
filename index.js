@@ -30,15 +30,10 @@ bot.command('delete', async (ctx) => {
       await ctx.deleteMessage(reply.message_id),
       await ctx.deleteMessage(message.message_id),
     ]);
-  }
-  catch (error) {
+  } catch (error) {
     console.log('\tCannot delete message');
     console.error(error);
   }
-});
-
-bot.command('add', async (ctx) => {
-  console.log(ctx.update.message);
 });
 
 bot.command('save', async (ctx) => {
@@ -70,6 +65,7 @@ bot.command('thread', async (ctx) => {
     return;
   }
 
+  addPosts = false;
   creatingThreads[from.id] = { stage: 0 };
   await ctx.reply('Котик, введи тему треда');
 });
@@ -129,6 +125,46 @@ bot.on('new_chat_members', async (ctx) => {
   }
 })
 
+async function addUntrackedPost(ctx) {
+  try {
+    console.log(ctx);
+    const message = ctx.update.message;
+    console.log(message);
+    return;
+    if(!message.forward_from_chat || message.forward_from_chat.id !== GROUP) {
+      console.log('Message is not forwarded from group chat');
+      return;
+    }
+    if(addPosts === true) {
+      addPosts = message.message_id;
+      threadsTracker.addThread(message.message_id, message.forward_date);
+      console.log('Forward thread is ' + addPosts);
+    } else {
+      threadsTracker.addPost(message.message_id, message.forward_date, addPosts);
+      console.log('Post added');
+    }
+  } catch(error) {
+    console.log(error);
+    await ctx.reply('Извини, что-то пошло не так. Попробуй ещё раз');
+  }
+}
+
+async function createThreadStage(ctx, status) {
+  try {
+    if(status.stage === 0) {
+      creatingThreads[from.id] = { stage: 1, title: message.text };
+      await ctx.reply('Молодец. Теперь введи текст для главного поста');
+    } else if(status.stage === 1) {
+      await createThread(ctx, status.title, message.text);
+      delete creatingThreads[from.id];
+    }
+  } catch(error) {
+    console.log(error);
+    delete creatingThreads[from.id];
+    await ctx.reply('Извини, что-то пошло не так. Попробуй ещё раз');
+  }
+}
+
 bot.on('text', async (ctx) => {
   const { message } = ctx.update;
   const { from, chat } = message;
@@ -143,19 +179,7 @@ bot.on('text', async (ctx) => {
 
   const status = creatingThreads[from.id];
   if(status) {
-    try {
-      if(status.stage === 0) {
-        creatingThreads[from.id] = { stage: 1, title: message.text };
-        await ctx.reply('Молодец. Теперь введи текст для главного поста');
-      } else if(status.stage === 1) {
-        await createThread(ctx, status.title, message.text);
-        delete creatingThreads[from.id];
-      }
-    } catch(error) {
-      console.log(error);
-      delete creatingThreads[from.id];
-      await ctx.reply('Извини, что-то пошло не так. Попробуй ещё раз');
-    }
+    await createThreadStage(ctx, status);
   }
 });
 /*bot.on('text', async (ctx) => {
