@@ -1,8 +1,9 @@
 require('dotenv').config();
 const { Telegraf, Telegram, Markup } = require('telegraf');
 const markdownEscape = require('markdown-escape');
-const NEW_LINE = '\r\n';
+const threadsTracker = require('./threads-tracker');
 
+const NEW_LINE = '\r\n';
 const GROUP = process.env.GROUP;
 const CHANNEL = process.env.CHANNEL;
 
@@ -36,6 +37,32 @@ bot.command('delete', async (ctx) => {
   }
 });
 
+bot.command('add', async (ctx) => {
+  console.log(ctx.update.message);
+});
+
+bot.command('save', async (ctx) => {
+  threadsTracker.save();
+});
+
+bot.command('top', async (ctx) => {
+  const chat = ctx.update.message.chat;
+  const tg = ctx.telegram;
+  const threads = threadsTracker.getTopThreads(3);
+
+  try {
+    const promises = [
+      ctx.reply('Котик, вот топовые треды'),
+    ];
+    for(const t of threads) {
+      promises.push(tg.forwardMessage(chat.id,GROUP, t.id));
+    }
+    await Promise.all(promises);
+  } catch(error) {
+    console.error(error);
+  }
+});
+
 bot.command('thread', async (ctx) => {
   const { from, chat } = ctx.update.message;
   if(chat.type !== 'private') {
@@ -61,6 +88,8 @@ async function createThread(ctx, title, text) {
     ]).reply_markup;
     await tg.sendMessage(CHANNEL, messageText, { parse_mode: 'Markdown', reply_markup: reply_markup });
     await tg.editMessageReplyMarkup(GROUP, groupMessageId, undefined, reply_markup);
+    threadsTracker.addThread(groupMessageId, groupMessage.date);
+    threadsTracker.save();
     await ctx.reply('Котик, твой тред готов', { reply_markup: reply_markup });
   } catch(error) {
     console.log(error);
@@ -104,6 +133,11 @@ bot.on('text', async (ctx) => {
   const { message } = ctx.update;
   const { from, chat } = message;
   if(from.is_bot || chat.type !== 'private') {
+    threadsTracker.addPost(
+      message.message_id,
+      message.date,
+      message.reply_to_message.message_id
+    );
     return;
   }
 
@@ -149,6 +183,15 @@ if(process.env.PROD) {
   bot.launch();
 }
 
+function onClose() {
+  threadsTracker.save();
+}
 // Enable graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+process.once('SIGINT', () => {
+  onClose();
+  bot.stop('SIGINT');
+ });
+process.once('SIGTERM', () => {
+  onClose();
+  bot.stop('SIGTERM');
+});
