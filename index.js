@@ -147,6 +147,9 @@ async function addUntrackedPost(ctx) {
 }
 
 async function createThreadStage(ctx, status) {
+  const message = ctx.update.message;
+  const from = message.from;
+  console.log(message, from);
   try {
     if(status.stage === 0) {
       creatingThreads[from.id] = { stage: 1, title: message.text };
