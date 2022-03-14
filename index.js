@@ -48,7 +48,9 @@ bot.on('new_chat_members', async (ctx) => {
   for (const member of ctx.message.new_chat_members) {
     tryToPromote(ctx, member);
   }
-})
+});
+
+
 
 if(process.env.PROD) {
   console.log('Launch in prod mode');
