@@ -1,25 +1,16 @@
 require('dotenv').config();
 const { Telegraf, Telegram, Markup } = require('telegraf');
-const markdownEscape = require('markdown-escape');
-const threadsTracker = require('./threads-tracker');
-
-const NEW_LINE = '\r\n';
-const GROUP = process.env.GROUP;
-const CHANNEL = process.env.CHANNEL;
 
 const bot = new Telegraf(process.env.TOKEN);
-
-const creatingThreads = {};
 
 bot.start((ctx) => ctx.reply('Привет'));
 
 bot.command('delete', async (ctx) => {
-  console.log('Deleting message...');
   const { message } = ctx.update;
   const { reply_to_message: reply } = message;
   try {
     if(!reply) {
-      await ctx.reply('Котик, я не понимаю что удалять. Вызови эту команду когда пишешь ответ на нужное сообщение');
+      await ctx.reply('Котик, я не понимаю что удалять. Вызови эту команду когда цитируешь нужное сообщение');
       return;
     }
     if(reply.chat.id !== message.chat.id) {
@@ -36,82 +27,19 @@ bot.command('delete', async (ctx) => {
   }
 });
 
-bot.command('save', async (ctx) => {
-  threadsTracker.save();
-});
-
-bot.command('top', async (ctx) => {
-  const chat = ctx.update.message.chat;
-  const tg = ctx.telegram;
-  const threads = threadsTracker.getTopThreads(3);
-  console.log(threads);
-  try {
-    await ctx.reply('Котик, вот топовые треды');
-    for(const t of threads) {
-      await tg.forwardMessage(chat.id,GROUP, t.id);
-    }
-  } catch(error) {
-    console.error(error);
-  }
-});
-
-bot.command('thread', async (ctx) => {
-  const { from, chat } = ctx.update.message;
-  if(chat.type !== 'private') {
-    await ctx.reply('Не так, котик. Чтобы создать новый тред пиши мне в личку');
-    return;
-  }
-
-  addPosts = false;
-  creatingThreads[from.id] = { stage: 0 };
-  await ctx.reply('Котик, введи тему треда');
-});
-
-async function createThread(ctx, title, text) {
-  try {
-    const tg = ctx.telegram;
-    const messageText = `*${markdownEscape('=== ' + title + ' ===')}*${NEW_LINE}${markdownEscape(text)}`;
-    const groupMessage = await tg.sendMessage(GROUP, messageText,{
-      parse_mode: 'Markdown',
-    });
-    const groupMessageId = groupMessage.message_id;
-
-    const reply_markup = Markup.inlineKeyboard([
-      Markup.button.url('К треду', `https://t.me/c/${GROUP.slice(4)}/99999999?thread=${groupMessageId}`)
-    ]).reply_markup;
-    await tg.sendMessage(CHANNEL, messageText, { parse_mode: 'Markdown', reply_markup: reply_markup });
-    await tg.editMessageReplyMarkup(GROUP, groupMessageId, undefined, reply_markup);
-    threadsTracker.addThread(groupMessageId, groupMessage.date);
-    threadsTracker.save();
-    await ctx.reply('Котик, твой тред готов', { reply_markup: reply_markup });
-  } catch(error) {
-    console.log(error);
-    await ctx.reply('Не повезло, не фортануло. Твой тред не создался');
-  }
-}
-
 async function tryToPromote(ctx, user) {
-  console.log('\tNew user: ' + user.username);
-  // Don't promote bots
   if(user.is_bot) {
-    console.log('\tIt is bot');
-    return false;
+    return;
   }
 
   try {
     const member = await ctx.getChatMember(user.id);
     if (member.status === 'member') {
       await ctx.promoteChatMember(user.id, { is_anonymous: true });
-      console.log('\tPromoted');
-      return true;
-    } else {
-      console.log('\tCannot promote ' + member.status);
-      return false;
     }
   } catch (error) {
     console.log('\tCannot promote');
     console.error(error);
-    return false;
   }
 }
 
@@ -121,78 +49,6 @@ bot.on('new_chat_members', async (ctx) => {
     tryToPromote(ctx, member);
   }
 })
-
-async function addUntrackedPost(ctx) {
-  try {
-    console.log(ctx);
-    const message = ctx.update.message;
-    console.log(message);
-    return;
-    if(!message.forward_from_chat || message.forward_from_chat.id !== GROUP) {
-      console.log('Message is not forwarded from group chat');
-      return;
-    }
-    if(addPosts === true) {
-      addPosts = message.message_id;
-      threadsTracker.addThread(message.message_id, message.forward_date);
-      console.log('Forward thread is ' + addPosts);
-    } else {
-      threadsTracker.addPost(message.message_id, message.forward_date, addPosts);
-      console.log('Post added');
-    }
-  } catch(error) {
-    console.log(error);
-    await ctx.reply('Извини, что-то пошло не так. Попробуй ещё раз');
-  }
-}
-
-async function createThreadStage(ctx, status) {
-  const message = ctx.update.message;
-  const from = message.from;
-  console.log(message, from);
-  try {
-    if(status.stage === 0) {
-      creatingThreads[from.id] = { stage: 1, title: message.text };
-      await ctx.reply('Молодец. Теперь введи текст для главного поста');
-    } else if(status.stage === 1) {
-      await createThread(ctx, status.title, message.text);
-      delete creatingThreads[from.id];
-    }
-  } catch(error) {
-    console.log(error);
-    delete creatingThreads[from.id];
-    await ctx.reply('Извини, что-то пошло не так. Попробуй ещё раз');
-  }
-}
-
-bot.on('text', async (ctx) => {
-  const { message } = ctx.update;
-  const { from, chat } = message;
-  if(from.is_bot || chat.type !== 'private') {
-    threadsTracker.addPost(
-      message.message_id,
-      message.date,
-      message.reply_to_message.message_id
-    );
-    return;
-  }
-
-  const status = creatingThreads[from.id];
-  if(status) {
-    await createThreadStage(ctx, status);
-  }
-});
-/*bot.on('text', async (ctx) => {
-  const { from, chat, message_id } = ctx.update.message;
-  if(from.is_bot || ctx.update.message.chat.type === 'private'){
-    return;
-  }
-  console.log('Text from a new user');
-  if(await tryToPromote(ctx, from)) {
-    await ctx.deleteMessage(message_id);
-    console.log('\tDelete message of promoted user');
-  }
-});*/
 
 if(process.env.PROD) {
   console.log('Launch in prod mode');
@@ -207,15 +63,10 @@ if(process.env.PROD) {
   bot.launch();
 }
 
-function onClose() {
-  threadsTracker.save();
-}
 // Enable graceful stop
 process.once('SIGINT', () => {
-  onClose();
   bot.stop('SIGINT');
  });
 process.once('SIGTERM', () => {
-  onClose();
   bot.stop('SIGTERM');
 });
