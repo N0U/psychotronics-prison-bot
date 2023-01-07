@@ -3,10 +3,14 @@ const { Telegraf, Telegram, Markup } = require('telegraf');
 
 const bot = new Telegraf(process.env.TOKEN);
 
+bot.telegram.setMyCommands([
+  { command: 'delete', description: 'Удалить сообщение анонимно' },
+]);
+
 bot.start((ctx) => ctx.reply('Привет'));
 
 bot.command('delete', async (ctx) => {
-  const { message } = ctx.update;
+  const message = ctx.message;
   const { reply_to_message: reply } = message;
   try {
     if(!reply) {
@@ -18,8 +22,8 @@ bot.command('delete', async (ctx) => {
       return;
     }
     await Promise.all([
-      await ctx.deleteMessage(reply.message_id),
-      await ctx.deleteMessage(message.message_id),
+      ctx.deleteMessage(reply.message_id),
+      ctx.deleteMessage(message.message_id),
     ]);
   } catch (error) {
     console.log('\tCannot delete message');
@@ -27,29 +31,22 @@ bot.command('delete', async (ctx) => {
   }
 });
 
-async function tryToPromote(ctx, user) {
-  if(user.is_bot) {
-    return;
-  }
-
+bot.on('chat_join_request', async (ctx) => {
   try {
-    const member = await ctx.getChatMember(user.id);
-    if (member.status === 'member') {
-      await ctx.promoteChatMember(user.id, { is_anonymous: true });
+    console.log('New join chat_join_request');
+    const { chat, from } = ctx.chatJoinRequest
+    if (from.is_bot) {
+      console.log('I wont aprove bot');
+      return;
     }
+    console.log(`${from.first_name} try to join ${chat.title}`);
+    await ctx.approveChatJoinRequest(from.id);
+    await ctx.promoteChatMember(from.id, { is_anonymous: true });
   } catch (error) {
-    console.log('\tCannot promote');
+    console.log('\tchat_join_request failed');
     console.error(error);
   }
-}
-
-bot.on('new_chat_members', async (ctx) => {
-  console.log('New chat members');
-  for (const member of ctx.message.new_chat_members) {
-    tryToPromote(ctx, member);
-  }
 });
-
 
 
 if(process.env.PROD) {
