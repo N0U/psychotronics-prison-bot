@@ -39,5 +39,5 @@ in {
 sudo mkdir -p /var/lib/psy-bot/ssl
 sudo cd /var/lib/psy-bot/ssl
 sudo openssl req -newkey rsa:2048 -sha256 -nodes -keyout cert.key -x509 -days 365 -out cert.pem -subj "/CN=$YOUR_DOMAIN_OR_IP" -addext "subjectAltName = IP:$YOUR_IP"
-sudo chown psy-bot:psy-bot -R cert.*
+sudo chown psy-bot:psy-bot -R /var/lib/psy-bot/ssl
 ```
